@@ -36,10 +36,36 @@ export class BotService {
         }
       );
 
-      return response.data?.choices?.[0]?.message?.content || 'Je ne peux pas répondre pour l’instant.';
+      return response.data?.choices?.[0]?.message?.content || '😊';
     } catch (error) {
-      console.error('Erreur de l\'API Mistral:', error);
-      return 'Je ne peux pas répondre pour l’instant.';
+      if (error.response && error.response.status === 429) {
+        throw new Error('Rate limit exceeded');
+      } else {
+        console.error('Erreur de l\'API Mistral:', error);
+        return '😊';
+      }
     }
+  }
+
+  async generateResponseWithRetry(msg: string, retries = 3, delayMs = 2000) {
+    const delay = (ms: number)=> {new Promise(resolve => setTimeout(resolve, ms))};
+  
+    while (retries > 0) {
+      try {
+        const response = await this.generateResponse(msg);
+        return response;
+      } catch (error) {
+        if (error.message === 'Rate limit exceeded' && retries > 0) {
+          console.log('Trop de requêtes, réessai dans ' + delayMs + 'ms');
+          await delay(delayMs);
+          retries--;
+          delayMs *= 2; 
+        } else {
+          console.error('Erreur lors de la génération de la réponse:', error);
+          throw error;
+        }
+      }
+    }
+    return '😊';
   }
 }

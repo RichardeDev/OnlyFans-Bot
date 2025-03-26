@@ -50,6 +50,11 @@ export class ScraperService {
         const cookies = await page.cookies();
         fs.writeFileSync(cookiesPath, JSON.stringify(cookies));
         console.log('Cookies sauvegardés');
+        const captcha = await page.$('iframe[src*="google.com/recaptcha"]');
+        if (captcha) {
+          console.log('Captcha détecté, besoin de le résoudre...');
+          await this.handleCaptcha(page);
+        }
       } else {
         console.log('Utilisateur déjà connecté');
       }
@@ -58,11 +63,6 @@ export class ScraperService {
       throw error;
     }
   
-    const captcha = await page.$('iframe[src*="google.com/recaptcha"]');
-    if (captcha) {
-      console.log('Captcha détecté, besoin de le résoudre...');
-      await this.handleCaptcha(page);
-    }
   
     const twoFactorPage = await page.$('input[name="verification_code"]');
     if (twoFactorPage) {
@@ -180,23 +180,49 @@ export class ScraperService {
   }
 
   async getMessages() {
-    const page = await this.loginToOnlyFans();
+    const url = 'https://onlyfans.com/api2/v2/chats';
+    const params = {
+      limit: 10,
+      offset: 0,
+      skip_users: 'all',
+      order: 'recent'
+    };
+
+    const headers = {
+      'accept': 'application/json, text/plain, */*',
+      'accept-language': 'fr,fr-FR;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',
+      'app-token': '33d57ade8c02dbc5a333db99ff9ae26a',
+      'priority': 'u=1, i',
+      'referer': 'https://onlyfans.com/my/chats/',
+      'sec-ch-ua': '"Chromium";v="134", "Not:A-Brand";v="24", "Microsoft Edge";v="134"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': '"Windows"',
+      'sec-fetch-dest': 'empty',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-site': 'same-origin',
+      'sign': '38772:91cf31c497318493dc2fc19bc24de875283b73f1:7a5:67dd85ab',
+      'time': '1742895332973',
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0',
+      'user-id': '485019792',
+      'x-bc': 'ff00b1c8a927081e73028fb72289e84535d33857',
+      'x-hash': 'Z8+ffULHwcx/lG65TtWH/lDPiiOjaYHhdIoMjsw=',
+      'x-of-rev': '202503211528-8728c0cb7a'
+    };
+    
+    const cookies = 'fp=ff00b1c8a927081e73028fb72289e84535d33857; csrf=y3CfHMdv9a5be2562a0d9c643c51ffba618c01d9; lang=fr; auth_id=485019792; st=56fc1d19f1f2aa26b76a8d30a0905ed1535cc9c2a026010dba3fd226afc3a5b1; sess=f2p3asl17hqegs1okg9j53jrn8; __cf_bm=gv0igV64RycbIN2sSTK15ltvouuQQz7P294o_IrmcfQ-1742891118-1.0.1.1-UlSkXGxxjaQCoYN8XdPAmbwhJ3uGBQT0VVD0TDzuNzq.NZEmYNgKWE12JzI5eFyIIaRhu4SRDvD3ApWSsetZfRa6Z03hOThUgo5aE4dwxUs; _cfuvid=56bsP.jt4KfhaxtakotdTUUf.muK0fXxN4DeYKPxRwI-1742816467478-0.0.1.1-604800000';
+    
+    headers['cookie'] = cookies;
+    
+
     try {
-      await page.goto('https://onlyfans.com/my/messages', { waitUntil: 'networkidle2', timeout: 240000 });
-  
-      const messages = await page.evaluate(() => {
-        return Array.from(document.querySelectorAll('.message-text'))
-          .map(el => {
-            const text = el.textContent;
-            return text ? text.trim() : ''; 
-          })
-          .filter(text => text.length > 0);
-      });
-  
-      return messages;
+      const response = await axios.get(url, { params, headers });
+
+      const unreadMessages = response.data.list.filter(chat => chat.lastMessage.isNew && chat.canSendMessage);
+      return unreadMessages;
+
     } catch (error) {
-      console.error('Erreur lors de la récupération des messages:', error);
-      return "This is empty";
+      console.error('Error fetching chats:', error.response?.data || error.message);
+      throw error;
     }
   }
 
