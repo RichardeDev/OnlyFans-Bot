@@ -27,6 +27,8 @@
     "dotenv": "^16.4.7",
     "openai": "^4.86.2",
     "puppeteer": "^24.4.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "twilio": "^5.4.5"
